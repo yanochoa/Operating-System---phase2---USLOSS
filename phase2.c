@@ -162,43 +162,60 @@ P2_Spawn(char *name, int (*func)(void *arg), void *arg, int stackSize,
     return -1;
 }
 
-void
-P2_TermRead(void *args) 
+int
+P2_TermRead(int unit, int size, char *buffer) 
 {
-	USLOSS_Sysargs	sa = *(USLOSS_Sysargs *) args;
-	
-	len = *(int *) sa.arg2;
 	int status = USLOSS_DEV_READY;
-	char * terminal;
+	char terminal[2];
 	
-	if (len < 0 || len > P2_MAX_LINE) {
-		sa.arg4 = (void *) -1;
-		return;
+	if (size < 0 || size > P2_MAX_LINE) {
+		return -1;
 	}
 	
 		// Wait for a character to be transmitted to the terminal
 	while (status == USLOSS_DEV_READY) {
-		USLOSS_DeviceInput(USLOSS_TERM_DEV, *(int *)sa.arg3, terminal);
-		status = 0xF & terminal;
+		USLOSS_DeviceInput(USLOSS_TERM_DEV, unit, &terminal);
+		status = USLOSS_TERM_STAT_RECV(terminal);
 	}
 	
 	if (status == USLOSS_DEV_ERROR) {
-		sa.arg4 = (void *) -1;
-		return;
+		return -1;
 	}
 	
-	char curr_char = terminal>>8;
-	sa.arg1 = (void *) &curr_char;
+	char curr_char = terminal[0];
+	buffer[0] = curr_char;
 	
 	i = 1;
-	while (status == USLOSS_DEV_BUSY && i < len) {
-		USLOSS_DeviceInput(USLOSS_TERM_DEV, *(int *)sa.arg3, terminal);
+	while (status == USLOSS_DEV_BUSY && i < size) {
+		USLOSS_DeviceInput(USLOSS_TERM_DEV, unit, terminal);
+		status = USLOSS_TERM_STAT_RECV(terminal);
 		char curr_char = terminal>>8;
-		sa.arg1+i = (void *) &curr_char;
+		buffer[i] = curr_char;
 	}
 	
-	sa.arg2 = (void *) i;
-	sa.arg4 = (void *) 0;
+	size = i;
+	return 0;
+}
+
+void
+P2_TermWrite(int unit, int size, char *text) 
+{
+	int status = USLOSS_DEV_READY;
+	char terminal[2];
+	
+	if (size < 0 || size > P2_MAX_LINE) {
+		return -1;
+	}
+	
+	int i;
+	for (i = 0; i < size; i++) {
+		terminal[0] = text[i];
+		terminal[1] = 0x1;
+		USLOSS_DeviceOutput(USLOSS_TERM_DEV, unit, &terminal);
+	}
+	
+	size = i;
+	return 0;
 }
 
 int     
