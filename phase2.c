@@ -5,41 +5,58 @@
    Skeleton file for Phase 2. These routines are very incomplete and are
    intended to give you a starting point. Feel free to use this or not.
 
-
+  Authors: Yan Ochoa,
    ------------------------------------------------------------------------ */
 
 #include <stdlib.h>
+#include <stdlib.h>
+#include <string.h>
 #include <usloss.h>
 #include <phase1.h>
 #include <phase2.h>
-#include "libuser.h"
 
 static int ClockDriver(void *arg);
 int P2_Spawn(char *name, int(*func)(void *), void *arg, int stackSize, int priority);
 int P2_Wait(int *status);
 static P1_Semaphore running;
+//added by me:
+int launch_p(void *arg);
 
+//-------User PCB
 typedef struct {
-	
-	void * messages;
-	int id;
-	int numslots;
-	int slotsize;
-	
+int ret_status;
+int cur_status;
+int paren_pid;
+
+} helper_PCB;
+
+//-------mailbox
+typedef struct Mailbox{
+  P1_Semaphore full;
+  P1_Semaphore mutex;
+  P1_Semaphore empty;
+  int mailboxId;
+  int slots;
+  int slotSize;
+
 } Mailbox;
 
-Mailbox * mailboxes[P2_MAX_MBOX];
+//globals
+int global_parentID;
+int parentPID;
 
-int
-P2_Startup(void *arg)
-{
+int P2_Startup(void *arg){
     int               status;
     int               result = 1; // default is there was a problem
     int               rc;
     /*
      * Check kernel mode
      */
-    // ...
+
+	if((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet())==0){
+	  USLOSS_Console("Not in kernel mode [p2_startup]");
+	 goto done;
+	}
 
     /*
      * Create clock device drivers.
@@ -68,12 +85,6 @@ P2_Startup(void *arg)
      * Create the other device drivers.
      */
     // ...
-	
-		// Initialize mailbox table
-	int i;
-	for (i = 0; i < P2_MAX_MBOX; i++){
-		mailboxes[i] = NULL;
-	}
 
     /* 
      * Create initial user-level process. You'll need to check error codes, etc. P2_Spawn
@@ -104,20 +115,18 @@ P2_Startup(void *arg)
         }
     }
 
-    // ...
-
     /*
      * Join with the device drivers.
      */
-    // ...
+
 
     result = 0;
 done:
     return result;
 }
 
-static int
-ClockDriver(void *arg)
+//-----------------------------------------------------------
+static int ClockDriver(void *arg)
 {
     int unit = (int) arg;
     int result = 1; // default is there was a problem
@@ -151,161 +160,92 @@ ClockDriver(void *arg)
          * Compute the current time and wake up any processes
          * that are done sleeping by sending them a response.
          */
+	
     }
     result = 0; // if we get here then everything is ok
 done:
-    return rc; 
+    return rc;
 }
 
-int
-P2_Sleep(int seconds)
-{
-		// Check for a valid seconds arg
-	if (seconds < 0) {
-		return 1;
+
+
+
+//--------------------------------------------------------
+
+//--------------------------------------------------------
+int P2_Spawn(char *name, int (*func)(void *arg), void *arg, int stackSize, int priority) {
+// USLOSS_Console("Entered P2_Spawn");
+//check for a valid priority
+  if((priority < 0) || (priority > 4)){
+	return -3;
+  }
+ //check the stacksize
+ if(stackSize < USLOSS_MIN_STACK){
+  return -2;
+  }
+
+
+
+  //check the mode
+  if((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet())==0){
+	  USLOSS_Console("Not in kernel mode [p2_Spawn]");
+	 //goto done;
 	}
-	
-	int i;
-	for (i = 0; i < seconds * 10; i++) {
-			// Returns after 100ms
-		ClockDriver(USLOSS_CLOCK_UNITS);
-	}
+//USLOSS_Console("about to run\n");
+
+  //P1_P(running);
+  parentPID = P1_GetPID();
+  int newPID = P1_Fork(name,launch_p,arg,stackSize,priority, 0);
+  //P1_V(running);
+//USLOSS_Console("abt to return from P2_Spawn\n");
+    return newPID;
+
+
+}
+//-------------------------------------------------------
+//similar to P1_Quit except for user level processes
+// returns status to P2_Wait called by its parent.
+void P2_Terminate(int status){
+  //P1_Quit()
+  //P2_Wait(status);
 }
 
-int     
-P2_Spawn(char *name, int (*func)(void *arg), void *arg, int stackSize, 
-                         int priority) 
-{
-    return -1;
+
+
+//--------------------------------------------------------
+//helper function launches func as user level
+int launch_p(void *arg){
+//set usermode
+
+
+//use a for something
+int a = USLOSS_PsrSet(USLOSS_PsrGet() & ~USLOSS_PSR_CURRENT_MODE);
+  helper_PCB incoming_process;
+
+  incoming_process.paren_pid = global_parentID;
+
+return a;  //change ret value later
 }
 
-int
-P2_TermRead(int unit, int size, char *buffer) 
-{
-	int status = USLOSS_DEV_READY;
-	char terminal[2];
-	
-	if (size < 0 || size > P2_MAX_LINE) {
-		return -1;
-	}
-	
-		// Wait for a character to be transmitted to the terminal
-	while (status == USLOSS_DEV_READY) {
-		USLOSS_DeviceInput(USLOSS_TERM_DEV, unit, &terminal);
-		status = USLOSS_TERM_STAT_RECV(terminal);
-	}
-	
-	if (status == USLOSS_DEV_ERROR) {
-		return -1;
-	}
-	
-	char curr_char = terminal[0];
-	buffer[0] = curr_char;
-	
-	i = 1;
-	while (status == USLOSS_DEV_BUSY && i < size) {
-		USLOSS_DeviceInput(USLOSS_TERM_DEV, unit, terminal);
-		status = USLOSS_TERM_STAT_RECV(terminal);
-		char curr_char = terminal>>8;
-		buffer[i] = curr_char;
-	}
-	
-	size = i;
-	return 0;
-}
+//------------------------------------------------------
+//similar to P1_Join but for user level proesses.
+// returns if a child was terminated. return the PID of the child process that exited .
 
-void
-P2_TermWrite(int unit, int size, char *text) 
-{
-	int status = USLOSS_DEV_READY;
-	char terminal[2];
-	
-	if (size < 0 || size > P2_MAX_LINE) {
-		return -1;
-	}
-	
-	int i;
-	for (i = 0; i < size; i++) {
-		terminal[0] = text[i];
-		terminal[1] = 0x1;
-		USLOSS_DeviceOutput(USLOSS_TERM_DEV, unit, &terminal);
-	}
-	
-	size = i;
-	return 0;
-}
-
-int     
-P2_Wait(int *status) 
+int P2_Wait(int *status) 
 {
     return -1;
 }
 
-void
-P2_Terminate(int status)
-{
-	
+
+//--------------------------------------------------
+int P2_Sleep(int seconds){
+  if(seconds < 0){
+  return 1;
+  }
+
+  else{
+  return 0;
+  }
+
 }
 
-int
-P2_MboxCreate(int slots, int size)
-{
-	int i;
-	for (i = 0; i < P2_MAX_MBOX; i++){
-		if (mailboxes[i] == NULL) {
-			break;
-		}
-	}
-	
-	if (i == P2_MAX_MBOX) {
-		return -1
-	}
-	
-	Mailbox * newbox = (Mailbox *)malloc(sizeof(Mailbox));
-	newbox->messages = (void *) malloc(sizeof(char) * size * slots);
-	newbox->slots = slots;
-	newbox->slotsize = size;
-	
-	mailboxes[i] = newbox;
-	
-	return i;
-}
-
-int
-P2_MboxRelease(int mbox)
-{
-	if (mbox < 0 || mbox >= P2_MAX_MBOX) {
-		return -1;
-	}
-	
-	if (mailboxes[mbox] == NULL) {
-		return -1;
-	}
-	
-	mailbox[mbox] == NULL;
-	return 0;
-}
-
-int
-P2_MboxSend(int mbox, void *msg, int *size) 
-{
-	return -1;
-}
-
-int
-P2_MboxCondSend(int mbox, void *msg, int *size)
-{
-	return -1;
-}
-
-int
-P2_MboxReceive(int mbox, void *msg, int *size)
-{
-	return -1;
-}
-
-int
-P2_MboxCondReceive(int mbox, void *msg, int *size)
-{
-	return -1;
-}
