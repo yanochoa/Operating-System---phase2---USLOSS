@@ -12,6 +12,7 @@
 #include <usloss.h>
 #include <phase1.h>
 #include <phase2.h>
+#include "libuser.h"
 
 static int ClockDriver(void *arg);
 int P2_Spawn(char *name, int(*func)(void *), void *arg, int stackSize, int priority);
@@ -139,6 +140,20 @@ done:
     return rc; 
 }
 
+int
+P2_Sleep(int seconds)
+{
+		// Check for a valid seconds arg
+	if (seconds < 0) {
+		return 1;
+	}
+	
+	int i;
+	for (i = 0; i < seconds; i++) {
+		ClockDriver();
+	}
+}
+
 int     
 P2_Spawn(char *name, int (*func)(void *arg), void *arg, int stackSize, 
                          int priority) 
@@ -152,3 +167,44 @@ P2_Wait(int *status)
     return -1;
 }
 
+void
+P2_Terminate(int status)
+{
+	
+}
+
+int
+P2_MboxCreate(int slots, int size)
+{
+	return -1;
+}
+
+int
+P2_MboxRelease(int mbox)
+{
+	return -1;
+}
+
+int
+P2_MboxSend(int mbox, void *msg, int *size) 
+{
+	return -1;
+}
+
+int
+P2_MboxCondSend(int mbox, void *msg, int *size)
+{
+	return -1;
+}
+
+int
+P2_MboxReceive(int mbox, void *msg, int *size)
+{
+	return -1;
+}
+
+int
+P2_MboxCondReceive(int mbox, void *msg, int *size)
+{
+	return -1;
+}
