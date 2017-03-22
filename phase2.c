@@ -149,8 +149,9 @@ P2_Sleep(int seconds)
 	}
 	
 	int i;
-	for (i = 0; i < seconds; i++) {
-		ClockDriver();
+	for (i = 0; i < seconds * 10; i++) {
+			// Returns after 100ms
+		ClockDriver(USLOSS_CLOCK_UNITS);
 	}
 }
 
@@ -159,6 +160,45 @@ P2_Spawn(char *name, int (*func)(void *arg), void *arg, int stackSize,
                          int priority) 
 {
     return -1;
+}
+
+void
+P2_TermRead(void *args) 
+{
+	USLOSS_Sysargs	sa = *(USLOSS_Sysargs *) args;
+	
+	len = *(int *) sa.arg2;
+	int status = USLOSS_DEV_READY;
+	char * terminal;
+	
+	if (len < 0 || len > P2_MAX_LINE) {
+		sa.arg4 = (void *) -1;
+		return;
+	}
+	
+		// Wait for a character to be transmitted to the terminal
+	while (status == USLOSS_DEV_READY) {
+		USLOSS_DeviceInput(USLOSS_TERM_DEV, *(int *)sa.arg3, terminal);
+		status = 0xF & terminal;
+	}
+	
+	if (status == USLOSS_DEV_ERROR) {
+		sa.arg4 = (void *) -1;
+		return;
+	}
+	
+	char curr_char = terminal>>8;
+	sa.arg1 = (void *) &curr_char;
+	
+	i = 1;
+	while (status == USLOSS_DEV_BUSY && i < len) {
+		USLOSS_DeviceInput(USLOSS_TERM_DEV, *(int *)sa.arg3, terminal);
+		char curr_char = terminal>>8;
+		sa.arg1+i = (void *) &curr_char;
+	}
+	
+	sa.arg2 = (void *) i;
+	sa.arg4 = (void *) 0;
 }
 
 int     
