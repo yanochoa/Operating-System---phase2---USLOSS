@@ -19,6 +19,17 @@ int P2_Spawn(char *name, int(*func)(void *), void *arg, int stackSize, int prior
 int P2_Wait(int *status);
 static P1_Semaphore running;
 
+typedef struct {
+	
+	void * messages;
+	int id;
+	int numslots;
+	int slotsize;
+	
+} Mailbox;
+
+Mailbox * mailboxes[P2_MAX_MBOX];
+
 int
 P2_Startup(void *arg)
 {
@@ -57,6 +68,12 @@ P2_Startup(void *arg)
      * Create the other device drivers.
      */
     // ...
+	
+		// Initialize mailbox table
+	int i;
+	for (i = 0; i < P2_MAX_MBOX; i++){
+		mailboxes[i] = NULL;
+	}
 
     /* 
      * Create initial user-level process. You'll need to check error codes, etc. P2_Spawn
@@ -233,13 +250,40 @@ P2_Terminate(int status)
 int
 P2_MboxCreate(int slots, int size)
 {
-	return -1;
+	int i;
+	for (i = 0; i < P2_MAX_MBOX; i++){
+		if (mailboxes[i] == NULL) {
+			break;
+		}
+	}
+	
+	if (i == P2_MAX_MBOX) {
+		return -1
+	}
+	
+	Mailbox * newbox = (Mailbox *)malloc(sizeof(Mailbox));
+	newbox->messages = (void *) malloc(sizeof(char) * size * slots);
+	newbox->slots = slots;
+	newbox->slotsize = size;
+	
+	mailboxes[i] = newbox;
+	
+	return i;
 }
 
 int
 P2_MboxRelease(int mbox)
 {
-	return -1;
+	if (mbox < 0 || mbox >= P2_MAX_MBOX) {
+		return -1;
+	}
+	
+	if (mailboxes[mbox] == NULL) {
+		return -1;
+	}
+	
+	mailbox[mbox] == NULL;
+	return 0;
 }
 
 int
