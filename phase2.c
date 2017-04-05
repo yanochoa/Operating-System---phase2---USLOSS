@@ -182,164 +182,6 @@ done:
     return rc;
 }
 
-int 
-P2_DiskRead(int unit, int track, int first, int sectors, void *buffer) {
-	
-	if (first < 0 || sectors < 0 || sectors > 4 * USLOSS_DISK_TRACK_SIZE) {
-		return -1;
-	}
-	
-	if (buffer == NULL || sizeof((char*)buffer) < (sizeof(char) * sectors * USLOSS_DISK_SECTOR_SIZE)) {
-		return -1;
-	}
-	
-	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
-	
-	request->opr = USLOSS_DISK_SEEK;
-	request->reg1 = track;
-	
-	int status = -1;
-	while(status != USLOSS_DEV_READY) {
-		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-		if (status == USLOSS_DEV_ERROR){ 
-			return status;
-		}
-	} 
-	
-	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-	
-	int i, currSector = first, currTrack = track;;
-	for (i = 0; i < sectors; i++, currSector++) {
-		
-		if (currSector >= USLOSS_DISK_TRACK_SIZE) {
-			currSector = 0;
-			
-			request->opr = USLOSS_DISK_SEEK;
-			request->reg1 = currTrack;
-	
-			status = -1;
-			while(status != USLOSS_DEV_READY) {
-				USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-				if (status == USLOSS_DEV_ERROR) { 
-					return status;
-				}
-			} 
-	
-			USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-		}
-	
-		request->opr = USLOSS_DISK_READ;
-		request->reg1 = currSector;
-		request->reg2 = &buffer[USLOSS_DISK_SECTOR_SIZE * i];
-		
-		status = -1;
-		while(status != USLOSS_DEV_READY) {
-			USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-			if (status == USLOSS_DEV_ERROR) { 
-				return status;
-			}
-		} 
-	
-		USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-	}
-	
-	return 0;
-}
-
-int 
-P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer) {
-	
-	if (first < 0 || sectors < 0 || sectors > 4 * USLOSS_DISK_TRACK_SIZE) {
-		return -1;
-	}
-	
-	if (buffer == NULL || sizeof((char*)buffer) < (sizeof(char) * sectors * USLOSS_DISK_SECTOR_SIZE)) {
-		return -1;
-	}
-	
-	
-	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
-	
-	request->opr = USLOSS_DISK_SEEK;
-	request->reg1 = track;
-	
-	int status = -1;
-	while(status != USLOSS_DEV_READY) {
-		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-		if (status == USLOSS_DEV_ERROR){ 
-			return status;
-		}
-	} 
-	
-	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-	
-	
-	int i, currSector = first, currTrack = track;;
-	for (i = 0; i < sectors; i++, currSector++) {
-		
-		if (currSector >= USLOSS_DISK_TRACK_SIZE) {
-			currSector = 0;
-			
-			request->opr = USLOSS_DISK_SEEK;
-			request->reg1 = currTrack;
-	
-			status = -1;
-			while(status != USLOSS_DEV_READY) {
-				USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-				if (status == USLOSS_DEV_ERROR) { 
-					return status;
-				}
-			} 
-	
-			USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-		}
-	
-		request->opr = USLOSS_DISK_WRITE;
-		request->reg1 = currSector;
-		request->reg2 = &buffer[USLOSS_DISK_SECTOR_SIZE * i];
-		
-		status = -1;
-		while(status != USLOSS_DEV_READY) {
-			USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-			if (status == USLOSS_DEV_ERROR) { 
-				return status;
-			}
-		} 
-	
-		USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-	}
-	
-	
-	return 0;
-}
-
-int 
-P2_DiskSize(int unit, int *sector, int *track, int *disk) {
-	
-	if (unit < 0 || sector == NULL || track == NULL || disk == NULL) {
-		return -1;
-	}
-	
-	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
-	
-	request->opr = USLOSS_DISK_TRACKS;
-	request->reg1 = disk;
-	
-	int status = -1;
-	while(status != USLOSS_DEV_READY) {
-		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
-		if (status == USLOSS_DEV_ERROR){ 
-			return status;
-		}
-	} 
-	
-	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
-	
-	*sector = USLOSS_SECTOR_SIZE;
-	*track = USLOSS_TRACK_SIZE;
-	
-	return 0;
-}
 
 
 //--------------------------------------------------------
@@ -652,5 +494,164 @@ P2_TermWrite(int unit, int size, char *text)
 	}
 	
 	size = i;
+	return 0;
+}
+
+int 
+P2_DiskRead(int unit, int track, int first, int sectors, void *buffer) {
+	
+	if (first < 0 || sectors < 0 || sectors > 4 * USLOSS_DISK_TRACK_SIZE) {
+		return -1;
+	}
+	
+	if (buffer == NULL || sizeof((char*)buffer) < (sizeof(char) * sectors * USLOSS_DISK_SECTOR_SIZE)) {
+		return -1;
+	}
+	
+	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
+	
+	request->opr = USLOSS_DISK_SEEK;
+	request->reg1 = track;
+	
+	int status = -1;
+	while(status != USLOSS_DEV_READY) {
+		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+		if (status == USLOSS_DEV_ERROR){ 
+			return status;
+		}
+	} 
+	
+	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+	
+	int i, currSector = first, currTrack = track;;
+	for (i = 0; i < sectors; i++, currSector++) {
+		
+		if (currSector >= USLOSS_DISK_TRACK_SIZE) {
+			currSector = 0;
+			
+			request->opr = USLOSS_DISK_SEEK;
+			request->reg1 = currTrack;
+	
+			status = -1;
+			while(status != USLOSS_DEV_READY) {
+				USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+				if (status == USLOSS_DEV_ERROR) { 
+					return status;
+				}
+			} 
+	
+			USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+		}
+	
+		request->opr = USLOSS_DISK_READ;
+		request->reg1 = currSector;
+		request->reg2 = &buffer[USLOSS_DISK_SECTOR_SIZE * i];
+		
+		status = -1;
+		while(status != USLOSS_DEV_READY) {
+			USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+			if (status == USLOSS_DEV_ERROR) { 
+				return status;
+			}
+		} 
+	
+		USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+	}
+	
+	return 0;
+}
+
+int 
+P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer) {
+	
+	if (first < 0 || sectors < 0 || sectors > 4 * USLOSS_DISK_TRACK_SIZE) {
+		return -1;
+	}
+	
+	if (buffer == NULL || sizeof((char*)buffer) < (sizeof(char) * sectors * USLOSS_DISK_SECTOR_SIZE)) {
+		return -1;
+	}
+	
+	
+	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
+	
+	request->opr = USLOSS_DISK_SEEK;
+	request->reg1 = track;
+	
+	int status = -1;
+	while(status != USLOSS_DEV_READY) {
+		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+		if (status == USLOSS_DEV_ERROR){ 
+			return status;
+		}
+	} 
+	
+	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+	
+	
+	int i, currSector = first, currTrack = track;;
+	for (i = 0; i < sectors; i++, currSector++) {
+		
+		if (currSector >= USLOSS_DISK_TRACK_SIZE) {
+			currSector = 0;
+			
+			request->opr = USLOSS_DISK_SEEK;
+			request->reg1 = currTrack;
+	
+			status = -1;
+			while(status != USLOSS_DEV_READY) {
+				USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+				if (status == USLOSS_DEV_ERROR) { 
+					return status;
+				}
+			} 
+	
+			USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+		}
+	
+		request->opr = USLOSS_DISK_WRITE;
+		request->reg1 = currSector;
+		request->reg2 = &buffer[USLOSS_DISK_SECTOR_SIZE * i];
+		
+		status = -1;
+		while(status != USLOSS_DEV_READY) {
+			USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+			if (status == USLOSS_DEV_ERROR) { 
+				return status;
+			}
+		} 
+	
+		USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+	}
+	
+	
+	return 0;
+}
+
+int 
+P2_DiskSize(int unit, int *sector, int *track, int *disk) {
+	
+	if (unit < 0 || sector == NULL || track == NULL || disk == NULL) {
+		return -1;
+	}
+	
+	USLOSS_DeviceRequest * request = (USLOSS_DeviceRequest *)malloc(sizeof(USLOSS_DeviceRequest));
+	
+	request->opr = USLOSS_DISK_TRACKS;
+	request->reg1 = disk;
+	
+	int status = -1;
+	while(status != USLOSS_DEV_READY) {
+		USLOSS_DeviceInput(USLOSS_DISK_DEV, unit, &status);
+		if (status == USLOSS_DEV_ERROR){ 
+			return status;
+		}
+	} 
+	
+	USLOSS_DeviceOutput(USLOSS_DISK_DEV, unit, request);
+	
+	*sector = USLOSS_SECTOR_SIZE;
+	*track = USLOSS_TRACK_SIZE;
+	
 	return 0;
 }
